@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI 控制面板</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--border:#2a2a3a;
+--text:#e4e4ef;--text2:#8888a0;--accent:#6c5ce7;--accent2:#a29bfe;
+--green:#00b894;--red:#ff6b6b;--orange:#fdcb6e;
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text)}
+
+#app{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+#sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s}
+.logo{padding:20px;font-size:1.3em;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-items{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:4px}
+.nav-btn{background:none;border:none;color:var(--text2);padding:10px 14px;border-radius:8px;cursor:pointer;font-size:.9em;text-align:left;transition:all .15s}
+.nav-btn:hover{background:var(--surface2);color:var(--text)}
+.nav-btn.active{background:var(--accent);color:#fff}
+.conn-status{padding:16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:.8em;color:var(--text2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0}
+.conn-status.ok .dot{background:var(--green)}
+.conn-status.connecting .dot{background:var(--orange);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Main */
+#main{flex:1;overflow:hidden;position:relative}
+.view{display:none;height:100%;flex-direction:column}
+.view.active{display:flex}
+
+/* Chat View */
+#view-chat{display:none;flex-direction:column}
+#view-chat.active{display:flex}
+.chat-header{padding:16px 24px;border-bottom:1px solid var(--border);font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.chat-header .actions{display:flex;gap:8px}
+.chat-header .actions button{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8em;transition:all .15s}
+.chat-header .actions button:hover{border-color:var(--accent);color:var(--accent)}
+.chat-messages{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:80%;padding:12px 16px;border-radius:12px;font-size:.9em;line-height:1.6;word-break:break-word;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg.system{align-self:center;background:none;color:var(--text2);font-size:.8em;padding:4px 12px}
+.msg.assistant code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px;font-size:.85em}
+.msg.assistant pre{background:rgba(0,0,0,.3);padding:10px;border-radius:6px;overflow-x:auto;margin:8px 0}
+.msg.assistant pre code{background:none;padding:0}
+.msg.assistant pre{position:relative}
+.msg.assistant pre code{display:block;overflow-x:auto;white-space:pre;padding:0}
+.msg.assistant h1,.msg.assistant h2,.msg.assistant h3,.msg.assistant h4,.msg.assistant h5,.msg.assistant h6{margin:12px 0 6px;font-weight:700;line-height:1.3}
+.msg.assistant h1{font-size:1.3em}
+.msg.assistant h2{font-size:1.15em}
+.msg.assistant h3{font-size:1.05em}
+.msg.assistant h4{font-size:1em}
+.msg.assistant hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.msg.assistant blockquote{border-left:3px solid var(--accent);padding-left:12px;margin:8px 0;color:var(--text2)}
+.msg.assistant ul,.msg.assistant ol{padding-left:20px;margin:6px 0}
+.msg.assistant li{margin:2px 0}
+.msg.assistant table{border-collapse:collapse;margin:8px 0;width:100%;font-size:.85em}
+.msg.assistant th,.msg.assistant td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.msg.assistant th{background:var(--surface2);font-weight:600}
+.msg.assistant tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.msg.assistant a{color:var(--accent2);text-decoration:underline}
+.msg.assistant img{max-width:100%;border-radius:8px}
+.msg.assistant strong{color:#fff}
+
+/* Tool calls */
+.tool-calls{align-self:flex-start;max-width:80%;display:flex;flex-direction:column;gap:4px}
+.tool-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:.82em}
+.tool-item.tool-running{border-color:var(--orange);background:rgba(253,203,110,.06)}
+.tool-item.tool-done{border-color:var(--green);background:rgba(0,184,148,.04)}
+.tool-icon{margin-right:4px}
+.tool-name{font-weight:600;color:var(--accent2)}
+.tool-output{margin-top:6px;padding-top:6px;border-top:1px solid var(--border);color:var(--text2);font-family:monospace;font-size:.9em;max-height:80px;overflow:hidden;word-break:break-all}
+.tool-args{margin-top:4px;color:var(--text2);font-family:monospace;font-size:.85em;opacity:.7;max-height:40px;overflow:hidden;word-break:break-all}
+
+/* Generating status */
+.generating-status{align-self:flex-start;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:8px 16px;font-size:.82em;color:var(--accent2);animation:gen-pulse 2s ease-in-out infinite}
+@keyframes gen-pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* Typing indicator */
+.typing{align-self:flex-start;color:var(--text2);font-size:.85em;padding:8px 16px;display:flex;align-items:center;gap:6px}
+.typing-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text2);animation:bounce .6s infinite alternate}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes bounce{to{opacity:.3;transform:translateY(-4px)}}
+
+.chat-input{padding:8px 24px 12px;border-top:1px solid var(--border);display:flex;gap:12px;align-items:flex-end}
+.chat-input textarea{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:10px;font-size:.9em;font-family:inherit;resize:none;min-height:44px;max-height:160px;outline:none;transition:border-color .15s}
+.chat-input textarea:focus{border-color:var(--accent)}
+.chat-input button{background:var(--accent);border:none;color:#fff;width:44px;height:44px;border-radius:10px;cursor:pointer;font-size:1.1em;transition:all .15s;flex-shrink:0}
+.chat-input button:hover{background:var(--accent2)}
+.chat-input button:disabled{opacity:.4;cursor:not-allowed}
+
+/* Status View */
+.view-content{padding:24px;overflow-y:auto;flex:1}
+.view-title{font-size:1.2em;font-weight:600;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h3{font-size:.9em;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.stat{background:var(--surface2);border-radius:8px;padding:14px}
+.stat .label{font-size:.75em;color:var(--text2);margin-bottom:4px}
+.stat .value{font-size:1.1em;font-weight:600}
+
+/* Commands View */
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.cmd-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s}
+.cmd-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.cmd-card .cmd-name{font-weight:600;margin-bottom:4px}
+.cmd-card .cmd-desc{font-size:.8em;color:var(--text2)}
+
+/* Sessions View */
+.session-list{display:flex;flex-direction:column;gap:8px}
+.session-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+.session-item .info .name{font-weight:600;font-size:.9em}
+.session-item .info .meta{font-size:.75em;color:var(--text2);margin-top:2px}
+.session-item .badge{font-size:.75em;padding:3px 10px;border-radius:20px;background:var(--surface2);color:var(--text2)}
+.session-item .badge.active{background:rgba(0,184,148,.15);color:var(--green)}
+
+/* Settings View */
+.setting-group{margin-bottom:24px}
+.setting-group label{display:block;font-size:.85em;color:var(--text2);margin-bottom:6px}
+.setting-group input,.setting-group select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:.9em;outline:none}
+.setting-group input:focus{border-color:var(--accent)}
+.btn{background:var(--accent);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:.9em;transition:all .15s}
+.btn:hover{background:var(--accent2)}
+.btn.secondary{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.btn.secondary:hover{border-color:var(--accent)}
+
+/* Mobile */
+@media(max-width:768px){
+#sidebar{position:fixed;left:-220px;z-index:100;height:100%;transition:left .2s}
+#sidebar.open{left:0}
+.mobile-header{display:flex !important;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center;gap:12px}
+.mobile-header button{background:none;border:none;color:var(--text);font-size:1.3em;cursor:pointer}
+.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+.mobile-overlay.show{display:block}
+.chat-messages{padding:12px 16px}
+.msg{max-width:90%}
+}
+@media(min-width:769px){.mobile-header{display:none !important}.mobile-overlay{display:none !important}}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav id="sidebar">
+    <div class="logo">🤖 <span>助手</span></div>
+    <div class="nav-items">
+      <button class="nav-btn active" data-view="chat">💬 对话</button>
+      <button class="nav-btn" data-view="status">📊 状态</button>
+      <button class="nav-btn" data-view="commands">⚡ 命令</button>
+      <button class="nav-btn" data-view="sessions">📋 会话</button>
+      <button class="nav-btn" data-view="settings">⚙️ 设置</button>
+    </div>
+    <div class="conn-status" id="connStatus">
+      <span class="dot"></span> <span class="label">未连接</span>
+    </div>
+    <div class="server-info" id="serverInfo" style="padding:12px;border-top:1px solid var(--border);font-size:.75em;color:var(--text2);line-height:1.6">
+      <div>💾 内存: <span id="memUsage">--</span></div>
+      <div>💿 磁盘: <span id="diskUsage">--</span></div>
+      <div>🖥️ CPU: <span id="cpuUsage">--</span></div>
+    </div>
+  </nav>
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+  <main id="main">
+    <div class="mobile-header">
+      <button id="menuBtn">☰</button>
+      <span>AI 控制面板</span>
+    </div>
+    <div id="view-chat" class="view active">
+      <div class="chat-header">
+        <span>💬 对话</span>
+        <div class="actions">
+          <button onclick="sendCommand('/new')">🔄 新会话</button>
+          <button onclick="sendCommand('/compact')">📦 压缩</button>
+          <button onclick="sendCommand('/status')">📊 状态</button>
+        </div>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <textarea id="chatInput" placeholder="输入消息..." rows="1"></textarea>
+        <button id="sendBtn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+    <div id="view-status" class="view"></div>
+    <div id="view-commands" class="view"></div>
+    <div id="view-sessions" class="view"></div>
+    <div id="view-settings" class="view"></div>
+  </main>
+</div>
+<script src="app.js?v=20260404e"></script>
+</body>
+</html>
